@@ -23,6 +23,16 @@ export default function DashboardPage() {
   const [entries, setEntries] = useState([]);
   const [streaks, setStreaks] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
+  const [savedMessageVisible, setSavedMessageVisible] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    setSavedMessageVisible(params.get('saved') === '1');
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -72,12 +82,20 @@ export default function DashboardPage() {
             <h1>Lapse Dashboard</h1>
             <p className="muted">Signed in as: {sessionEmail}</p>
           </div>
-          <button type="button" onClick={handleLogout}>
-            Log out
-          </button>
+          <div className="row">
+            <button type="button" onClick={() => router.push('/record')}>
+              Record today
+            </button>
+            <button type="button" onClick={handleLogout}>
+              Log out
+            </button>
+          </div>
         </div>
 
         {loading ? <p className="muted">Loading...</p> : null}
+        {savedMessageVisible ? (
+          <p className="space-top">Saved. Your timelapse entry was uploaded successfully.</p>
+        ) : null}
         {errorMessage ? <p>Error: {errorMessage}</p> : null}
 
         {!loading && !errorMessage ? (
