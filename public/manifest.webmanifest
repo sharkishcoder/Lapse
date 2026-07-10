@@ -1,0 +1,9 @@
+{
+  "name": "Lapse",
+  "short_name": "Lapse",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#175c4c",
+  "description": "Daily shared timelapse streak tracker"
+}
