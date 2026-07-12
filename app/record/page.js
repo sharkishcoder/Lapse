@@ -62,6 +62,8 @@ export default function RecordPage() {
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const recordedBlobRef = useRef(null);
+  const recordedMimeTypeRef = useRef('');
 
   const [loading, setLoading] = useState(true);
   const [startingCamera, setStartingCamera] = useState(false);
@@ -178,6 +180,8 @@ export default function RecordPage() {
       recorder.onstop = () => {
         const blobType = mimeType || 'video/webm';
         const blob = new Blob(chunksRef.current, { type: blobType });
+        recordedBlobRef.current = blob;
+        recordedMimeTypeRef.current = blobType;
         const url = URL.createObjectURL(blob);
         setPreviewUrl(url);
         setSuccessMessage('');
@@ -207,15 +211,38 @@ export default function RecordPage() {
     }
 
     chunksRef.current = [];
+    recordedBlobRef.current = null;
+    recordedMimeTypeRef.current = '';
     setDurationSeconds(0);
     setSuccessMessage('');
+  }
+
+  function getBlobDurationSeconds(blobUrl) {
+    return new Promise((resolve) => {
+      const tempVideo = document.createElement('video');
+      tempVideo.preload = 'metadata';
+
+      const handleLoadedMetadata = () => {
+        if (Number.isFinite(tempVideo.duration) && tempVideo.duration > 0) {
+          resolve(Math.round(tempVideo.duration));
+        } else {
+          resolve(null);
+        }
+      };
+
+      const handleError = () => resolve(null);
+
+      tempVideo.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+      tempVideo.addEventListener('error', handleError, { once: true });
+      tempVideo.src = blobUrl;
+    });
   }
 
   async function saveTodayEntry() {
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!previewUrl || chunksRef.current.length === 0) {
+    if (!previewUrl || !recordedBlobRef.current) {
       setErrorMessage('Record a clip first, then save it.');
       return;
     }
@@ -235,11 +262,14 @@ export default function RecordPage() {
     try {
       const userId = session.user.id;
       const todayDate = getTodayDateString();
-      const mimeType = pickMimeType() || 'video/webm';
+      const mimeType = recordedMimeTypeRef.current || pickMimeType() || 'video/webm';
       const fileExtension = getFileExtension(mimeType);
       const timestamp = Date.now();
       const filePath = `${userId}/${todayDate}-${timestamp}.${fileExtension}`;
-      const blob = new Blob(chunksRef.current, { type: mimeType });
+      const blob = recordedBlobRef.current;
+      const measuredDuration = await getBlobDurationSeconds(previewUrl);
+      const fallbackDuration = durationSeconds > 0 ? durationSeconds : null;
+      const finalDuration = measuredDuration ?? fallbackDuration;
 
       const { error: uploadError } = await supabase.storage
         .from('timelapses')
@@ -280,6 +310,10 @@ export default function RecordPage() {
           user_id: userId,
           entry_date: todayDate,
           video_url: signedUrl,
+          source_storage_path: filePath,
+          source_mime_type: mimeType,
+          source_duration_seconds: finalDuration,
+          processing_status: 'uploaded',
           streak_count: streakCount,
         },
         { onConflict: 'user_id,entry_date' }

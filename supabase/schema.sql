@@ -14,10 +14,29 @@ create table if not exists public.daily_timelapses (
   user_id uuid not null references public.profiles(user_id) on delete cascade,
   entry_date date not null,
   video_url text not null,
+  source_storage_path text,
+  source_mime_type text,
+  source_duration_seconds integer,
+  processing_status text not null default 'uploaded' check (processing_status in ('uploaded', 'processing', 'ready', 'failed')),
   streak_count integer not null default 0 check (streak_count >= 0),
   created_at timestamptz not null default now(),
   unique (user_id, entry_date)
 );
+
+alter table public.daily_timelapses add column if not exists source_storage_path text;
+alter table public.daily_timelapses add column if not exists source_mime_type text;
+alter table public.daily_timelapses add column if not exists source_duration_seconds integer;
+alter table public.daily_timelapses add column if not exists processing_status text;
+
+update public.daily_timelapses
+set processing_status = coalesce(processing_status, 'uploaded')
+where processing_status is null;
+
+alter table public.daily_timelapses alter column processing_status set default 'uploaded';
+
+alter table public.daily_timelapses drop constraint if exists daily_timelapses_processing_status_check;
+alter table public.daily_timelapses add constraint daily_timelapses_processing_status_check
+check (processing_status in ('uploaded', 'processing', 'ready', 'failed'));
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -122,7 +141,7 @@ using (
 )
 with check (
   bucket_id = 'timelapses'
-  and (storage.foldername(name))[1] = auth.uid()::textn
+  and (storage.foldername(name))[1] = auth.uid()::text
 );
 
 drop policy if exists "users can delete own timelapse objects" on storage.objects;

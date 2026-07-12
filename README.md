@@ -42,7 +42,7 @@ This is the quick map for making changes without hunting through the codebase.
 
 - `supabase/schema.sql`
 	- Source of truth for database tables, triggers, and RLS policies.
-	- Edit this when changing data structure (new columns/tables), auth-related triggers, or access rules.
+	- Edit this when changing data structure (new columns/tables), auth-related triggers, access rules, or transcoding pipeline fields.
 
 ### PWA setup
 
@@ -87,8 +87,14 @@ This first setup includes:
 - Initial database schema for daily timelapses and streak tracking
 - Supabase Storage bucket + policies for authenticated uploads
 - Camera recording page with upload + daily DB save flow
+- Recorder now preserves exact captured blob/mime during upload for better media reliability
+- Daily rows now store source media metadata (`source_storage_path`, `source_mime_type`, `source_duration_seconds`, `processing_status`) for future transcoding pipeline
 
 Streak calculation is currently computed in the recorder flow before saving today's row.
+
+## Later To-Do (Deferred)
+
+- Dashboard UX upgrade: replace raw video URL links with inline video player cards and better playback controls.
 
 ## 1) Install dependencies
 
