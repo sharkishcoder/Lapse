@@ -53,6 +53,42 @@ begin
 end;
 $$;
 
+create or replace function public.calculate_current_streak(p_user_id uuid, p_as_of_date date)
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  streak integer := 0;
+  probe_date date := p_as_of_date;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if auth.uid() <> p_user_id then
+    raise exception 'Unauthorized streak access';
+  end if;
+
+  loop
+    exit when not exists (
+      select 1
+      from public.daily_timelapses dt
+      where dt.user_id = p_user_id
+        and dt.entry_date = probe_date
+    );
+
+    streak := streak + 1;
+    probe_date := probe_date - interval '1 day';
+  end loop;
+
+  return streak;
+end;
+$$;
+
+grant execute on function public.calculate_current_streak(uuid, date) to authenticated;
+
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users

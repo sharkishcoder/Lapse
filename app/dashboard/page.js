@@ -50,7 +50,7 @@ export default function DashboardPage() {
 
       const { data, error } = await supabase
         .from('daily_timelapses')
-        .select('id,user_id,entry_date,video_url,streak_count,profiles(display_name)')
+        .select('id,user_id,entry_date,video_url,source_storage_path,streak_count,profiles(display_name)')
         .order('entry_date', { ascending: false })
         .limit(20);
 
@@ -61,8 +61,36 @@ export default function DashboardPage() {
       }
 
       const rows = data ?? [];
-      setEntries(rows);
-      setStreaks(summarizeStreaks(rows));
+
+      const rowsWithPlaybackUrls = await Promise.all(
+        rows.map(async (row) => {
+          if (!row.source_storage_path) {
+            return {
+              ...row,
+              playback_url: row.video_url,
+            };
+          }
+
+          const { data: signedData, error: signedError } = await supabase.storage
+            .from('timelapses')
+            .createSignedUrl(row.source_storage_path, 60 * 60 * 24);
+
+          if (signedError) {
+            return {
+              ...row,
+              playback_url: row.video_url,
+            };
+          }
+
+          return {
+            ...row,
+            playback_url: signedData?.signedUrl ?? row.video_url,
+          };
+        })
+      );
+
+      setEntries(rowsWithPlaybackUrls);
+      setStreaks(summarizeStreaks(rowsWithPlaybackUrls));
       setLoading(false);
     }
 
@@ -124,12 +152,16 @@ export default function DashboardPage() {
                   <article key={row.id} className="item">
                     <strong>{row.profiles?.display_name ?? 'Unknown user'}</strong>
                     <p className="muted">Date: {row.entry_date}</p>
-                    <p>
-                      Video URL:{' '}
-                      <a href={row.video_url} target="_blank" rel="noreferrer">
-                        {row.video_url}
-                      </a>
-                    </p>
+                    {row.playback_url ? (
+                      <p>
+                        Video URL:{' '}
+                        <a href={row.playback_url} target="_blank" rel="noreferrer">
+                          {row.playback_url}
+                        </a>
+                      </p>
+                    ) : (
+                      <p className="muted">Video link unavailable for this entry.</p>
+                    )}
                   </article>
                 ))}
               </div>

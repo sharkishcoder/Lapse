@@ -37,25 +37,6 @@ function getTodayDateString() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getPreviousDateString(dateString) {
-  const date = new Date(`${dateString}T00:00:00`);
-  date.setDate(date.getDate() - 1);
-  return date.toISOString().slice(0, 10);
-}
-
-function calculateStreakIncludingToday(dateStrings, todayDate) {
-  const availableDates = new Set(dateStrings);
-  let streak = 1;
-  let pointer = getPreviousDateString(todayDate);
-
-  while (availableDates.has(pointer)) {
-    streak += 1;
-    pointer = getPreviousDateString(pointer);
-  }
-
-  return streak;
-}
-
 export default function RecordPage() {
   const router = useRouter();
   const liveVideoRef = useRef(null);
@@ -293,34 +274,42 @@ export default function RecordPage() {
         throw new Error('Could not generate a signed URL for the uploaded video.');
       }
 
-      const { data: existingRows, error: streakError } = await supabase
-        .from('daily_timelapses')
-        .select('entry_date')
-        .eq('user_id', userId);
-
-      if (streakError) {
-        throw streakError;
-      }
-
-      const dateStrings = (existingRows ?? []).map((row) => row.entry_date).filter((date) => date !== todayDate);
-      const streakCount = calculateStreakIncludingToday(dateStrings, todayDate);
-
       const { error: upsertError } = await supabase.from('daily_timelapses').upsert(
         {
           user_id: userId,
           entry_date: todayDate,
+          // Kept for backward compatibility; dashboard now prefers source_storage_path.
           video_url: signedUrl,
           source_storage_path: filePath,
           source_mime_type: mimeType,
           source_duration_seconds: finalDuration,
           processing_status: 'uploaded',
-          streak_count: streakCount,
+          streak_count: 0,
         },
         { onConflict: 'user_id,entry_date' }
       );
 
       if (upsertError) {
         throw upsertError;
+      }
+
+      const { data: streakCount, error: streakRpcError } = await supabase.rpc('calculate_current_streak', {
+        p_user_id: userId,
+        p_as_of_date: todayDate,
+      });
+
+      if (streakRpcError) {
+        throw streakRpcError;
+      }
+
+      const { error: streakUpdateError } = await supabase
+        .from('daily_timelapses')
+        .update({ streak_count: streakCount ?? 0 })
+        .eq('user_id', userId)
+        .eq('entry_date', todayDate);
+
+      if (streakUpdateError) {
+        throw streakUpdateError;
       }
 
       setSuccessMessage('Saved. Your timelapse is uploaded and today is recorded.');

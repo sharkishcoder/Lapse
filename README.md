@@ -89,8 +89,10 @@ This first setup includes:
 - Camera recording page with upload + daily DB save flow
 - Recorder now preserves exact captured blob/mime during upload for better media reliability
 - Daily rows now store source media metadata (`source_storage_path`, `source_mime_type`, `source_duration_seconds`, `processing_status`) for future transcoding pipeline
+- Dashboard now generates fresh signed playback URLs from `source_storage_path` to avoid expired-link issues
+- Streak count is now computed server-side via SQL function (`calculate_current_streak`)
 
-Streak calculation is currently computed in the recorder flow before saving today's row.
+Streak updates happen right after save using the server-side streak function.
 
 ## Later To-Do (Deferred)
 
