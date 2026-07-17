@@ -4,7 +4,7 @@ This file tracks what I build, what confuses me, and what I learn —
 session by session — while building this project. It lives in the
 project folder so it stays permanently tied to the code it describes.
 
----
+--- 
 
 ## How to use this file
 
