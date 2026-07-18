@@ -39,7 +39,7 @@ useful to future-you than pretending everything made sense right away.
 ---
 
 ## Entries
-
+ 
 ## Day 1 — Learning the basics before touching code
 **Date:** 
 
